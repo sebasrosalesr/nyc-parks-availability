@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     )
     yield
     logger.info("Shutting down — closing HTTP client")
-    app.state.http_client.close()
+    await app.state.http_client.close()
 
 
 app = FastAPI(

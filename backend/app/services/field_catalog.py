@@ -46,7 +46,10 @@ async def fetch_map_shell(client: AsyncSession) -> str:
 
         url = f"{settings.nyc_parks_base}{MAP_PAGE_PATH}"
         resp = await client.get(url, headers=HTML_HEADERS, timeout=settings.request_timeout_s)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            logger.warning("Map shell returned %s; continuing without it", resp.status_code)
+            _map_shell_cache["html"] = ""
+            return ""
         _map_shell_cache["html"] = resp.text
         return resp.text
 

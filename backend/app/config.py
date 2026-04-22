@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     field_close_hour: int = 22
     slot_minutes: int = 60
     max_range_days: int = 14
+    prefer_fallback_availability: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

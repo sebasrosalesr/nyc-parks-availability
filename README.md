@@ -2,6 +2,41 @@
 
 A full-stack, real-time availability dashboard built for the M-Flat case study. It provides non-technical ops users a single cohesive screen to instantly compare NYC Parks athletic field schedules across arbitrary date ranges, saving hours of manual map clicking.
 
+## Live Deployments
+
+- Frontend (Vercel): https://nyc-parks-availability.vercel.app
+- Backend (Fly.io): https://nyc-parks-availability-api-sebas.fly.dev
+- Backend health check: https://nyc-parks-availability-api-sebas.fly.dev/health
+
+The frontend is deployed separately from the API:
+
+- `frontend/` is deployed to Vercel as a static Vite app.
+- `backend/` is deployed to Fly.io as a FastAPI service using `backend/fly.toml`.
+
+## Deployment
+
+### Vercel
+
+The frontend is configured by `frontend/vercel.json` and expects `VITE_API_URL` to point at the deployed backend.
+
+Production deploy pattern:
+
+```bash
+cd frontend
+npx vercel deploy --prod -y -b VITE_API_URL=https://nyc-parks-availability-api-sebas.fly.dev
+```
+
+### Fly.io
+
+The backend is configured by `backend/fly.toml` and deployed as a Dockerized FastAPI app.
+
+Production deploy pattern:
+
+```bash
+cd backend
+flyctl deploy --config fly.toml --remote-only
+```
+
 ## What It Does
 
 - Choose a sport, borough, and dynamic date range.
@@ -28,7 +63,15 @@ Then open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
 ## Architecture
 
-To overcome extreme Cloudflare rate-limits and JavaScript challenges imposed on the NYC Parks official JSON APIs, the backend was pivoted to a highly-scalable bulk CSV interval engine.
+The app uses a split deployment model:
+
+- Vercel serves the React/Vite frontend.
+- Fly.io serves the FastAPI backend.
+
+For data collection, the backend mixes two strategies:
+
+- Live field catalog discovery from NYC Parks vector tiles.
+- Availability generation from either live CSV permit data or a deterministic fallback mode when NYC Parks blocks server-side requests from cloud infrastructure.
 
 ### Frontend
 - **React + Vite**
@@ -39,17 +82,20 @@ To overcome extreme Cloudflare rate-limits and JavaScript challenges imposed on 
   - Granular 60-minute time-slot pills deeply linked to the official NYC scheduling page.
 
 ### Backend
-- **FastAPI** leveraging `curl_cffi` for native browser TLS impersonation to evade Cloudflare blockades seamlessly.
+- **FastAPI** with `curl_cffi` for browser-like outbound requests.
 - **Data Source 1 (Catalog):** Pulls from `https://maps.nycgovparks.org/athletic_facility/...` via Mapbox Vector Tiles to dynamically reconstruct the underlying citywide catalog of active properties.
-- **Data Source 2 (Live CSV Engine):** Hits the undocumented `https://www.nycgovparks.org/permits/field-and-court/issued/{propId}/csv` endpoint. Instead of pinging NYC Parks 600+ times to sample microscopic availability point-in-time intervals, the backend concurrently pulls the full season's spreadsheet for all targeted parks. It then processes thousands of rows of real, issued permit times into exact mathematical interval overlaps to return flawless availability data.
+- **Data Source 2 (Live CSV Engine):** Attempts the undocumented `https://www.nycgovparks.org/permits/field-and-court/issued/{propId}/csv` endpoint and parses issued permits into field-level open intervals.
+- **Hosted Fallback Mode:** On Fly.io, `PREFER_FALLBACK_AVAILABILITY=true` is enabled because NYC Parks currently returns `403` for many cloud-hosted CSV requests. In that environment, the backend still uses the live citywide catalog but serves deterministic fallback availability for the schedule grid.
 
 ### Why This Approach?
-The public NYC Parks site does not expose a documented API for multi-field search. By reverse-engineering their map APIs and discovering the underlying CSV dumps, we achieved an un-blockable 95% reduction in network overhead. The result operates blazingly fast and delivers 100% accurate data natively extracted from the city's spreadsheets.
+The public NYC Parks site does not expose a documented API for multi-field search. Reverse-engineering the public map stack makes it possible to reconstruct a usable citywide field catalog and, when not blocked, derive availability from the same permit data NYC Parks uses internally.
 
 ## Key Tradeoffs & Limitations
 
-- **Informal Availability:** The data accurately tracks *Issued Permits*. As noted by NYC Parks, fields without a formal permit are technically open "first come, first served". The dashboard relies strictly on formal availability.
-- **Cold Cache Latency:** The initial search may take 3-5 seconds to download the CSVs of multiple parks concurrently. Subsequent requests are instant.
+- **Hosted fallback on Fly.io:** The public deployment does not currently get reliable live permit CSV access from Fly.io because NYC Parks blocks many server-side requests from cloud IP ranges. The hosted app therefore uses live catalog data plus deterministic fallback availability.
+- **Local and future server environments may differ:** The live CSV path is still present in the codebase and can be used in environments where NYC Parks does not block the requests.
+- **Informal Availability:** Even in live mode, the tool models issued permits only. Fields without a formal permit may still be used first-come, first-served.
+- **Cold cache latency in live mode:** When live CSV fetching is available, the initial search may take a few seconds to download and parse multiple park CSVs.
 - **14-Day Limit:** While technically capable of checking months at a time now that we own the CSVs, visual density in the UI is best conserved within a 14-day trailing viewport.
 
 ## What I Would Harden Next for M-Flat
