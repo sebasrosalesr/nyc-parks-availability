@@ -105,4 +105,5 @@ The public NYC Parks site does not expose a documented API for multi-field searc
 
 ## Artificial Intelligence Tools Used
 
-- **Deep AI Contextual Assistance:** Used to rapidly reverse-engineer Mapbox Vector Tiles, iterate advanced CSV interval parsing math, and seamlessly deploy `curl_cffi` TLS impersonation to bypass enterprise Web Application Firewalls all well within the 1-hour time budget.
+- **Deep AI Contextual Assistance:** Claude (Anthropic) via Claude Code — used to rapidly reverse-engineer Mapbox Vector Tiles, iterate CSV interval parsing logic, and deploy `curl_cffi` TLS impersonation to bypass enterprise Web Application Firewalls all well within the 1-hour time budget.
+
